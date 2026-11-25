@@ -17,11 +17,30 @@ const areas=['Calidad','Digital','Marketing'], classes={Calidad:'quality',Digita
 let area='all',status='all',view='overview',sortAscending=false;const taskProgress=t=>t.status==='done'?100:t.status==='progress'?50:0;const $=s=>document.querySelector(s);const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const label=s=>({done:'Completado',progress:'En curso',pending:'Pendiente'}[s]);
 function persist(){localStorage.setItem('orbita-tasks-v1',JSON.stringify(tasks))}function toast(s){$('#toast').textContent=s;$('#toast').classList.add('show');clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),3000)}
 function laneLayout(list){const ends=[-1,-1],positions={};list.slice().sort((a,b)=>a.start-b.start).forEach((t,i)=>{let row=i%2;if(ends[row]>t.start){row=ends.findIndex(end=>end<=t.start);if(row<0)row=ends.length}ends[row]=t.start+t.duration;positions[t.id]=row});return {positions,height:Math.max(106,ends.length*38+27)}}
-function renderLegacy(){const filtered=tasks.filter(t=>area==='all'||t.area===area),deliveries=filtered.filter(t=>t.deliverable),done=deliveries.filter(t=>t.status==='done').length,progress=Math.round(filtered.reduce((n,t)=>n+taskProgress(t),0)/(filtered.length||1));$('#total').textContent=filtered.length;$('#progress').innerHTML=progress+'<span>%</span>';$('#side-progress').textContent=progress+'%';$('.mini-track span').style.width=progress+'%';$('#completed').innerHTML=done+' <em>/ '+deliveries.length+'</em>';$('#pending-label').textContent=(deliveries.length-done)+' pendientes de entrega';$('#nav-count').textContent=deliveries.length;$('#delivery-count').textContent=deliveries.length;renderMetrics(filtered,deliveries,done,progress);
+function renderSummary() {
+  const filtered = tasks.filter(task => area === 'all' || task.area === area);
+  const deliveries = filtered.filter(task => task.deliverable);
+  const progress = Math.round(filtered.reduce((sum, task) => sum + taskProgress(task), 0) / (filtered.length || 1));
+  $('#side-progress').textContent = progress + '%';
+  $('.mini-track span').style.width = progress + '%';
+  $('#nav-count').textContent = deliveries.length;
+  $('#delivery-count').textContent = deliveries.length;
 }
-function setView(v){view=v;$('.dashboard').classList.toggle('focused',v!=='overview');document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('visible',p.id===v));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===v));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('selected',b.dataset.view===v));$('.breadcrumb b').textContent=({overview:'Vista general',timeline:'Cronograma',deliverables:'Entregables',flow:'Flujograma',team:'Equipo'})[v];renderProject();if(v!=='overview')document.getElementById(v).scrollIntoView({behavior:'smooth',block:'start'});}
+function setView(v) {
+  view = v;
+  const panelId = v === 'deliverables' ? 'timeline' : ['documentation', 'records'].includes(v) ? 'resource-hub' : v;
+  $('.dashboard').classList.toggle('focused', v !== 'overview');
+  document.querySelectorAll('.dashboard > .panel').forEach(panel => panel.classList.toggle('visible', panel.id === panelId));
+  document.querySelectorAll('[data-nav]').forEach(button => button.classList.toggle('active', button.dataset.nav === v));
+  document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('selected', button.dataset.view === v));
+  $('.breadcrumb b').textContent = ({ overview: 'Vista general', timeline: 'Cronograma', deliverables: 'Entregables', flow: 'Flujograma', team: 'Equipo', documentation: 'Documentación', records: 'Registros' })[v];
+  if (v === 'timeline' || v === 'deliverables') setScheduleTab(v === 'deliverables' ? 'deliverables' : 'calendar');
+  else renderProject();
+  if (v === 'documentation' || v === 'records') document.dispatchEvent(new CustomEvent('resources:select-tab', { detail: v }));
+  if (v !== 'overview') document.getElementById(panelId).scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 document.querySelectorAll('[data-nav],[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.nav||b.dataset.view));$('#area').onchange=e=>{area=e.target.value;render()};document.querySelectorAll('[data-status]').forEach(button => button.onclick = () => { status = button.dataset.status; renderBacklog(); });
-document.addEventListener('click',e=>{const check=e.target.closest('[data-check]');if(check){const t=tasks.find(t=>t.id===Number(check.dataset.check));t.status=t.status==='done'?'pending':'done';persist();render();toast('Entregable actualizado');return}const task=e.target.closest('[data-task]');if(task)showTask(task.dataset.task)});document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.delivery-title'))showTask(e.target.dataset.task)});document.querySelectorAll('dialog .close').forEach(b=>b.onclick=()=>b.closest('dialog').close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));function openActivity(delivery = false) {
+document.querySelectorAll('dialog .close').forEach(b=>b.onclick=()=>b.closest('dialog').close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));function openActivity(delivery = false) {
   const form = $('#activity-form');
   form.reset();
   if (area !== 'all') form.elements.area.value = area;
@@ -31,19 +50,7 @@ document.addEventListener('click',e=>{const check=e.target.closest('[data-check]
   $('#activity-dialog').showModal();
 }
 $('#new').onclick=()=>openActivity();$('#activity-form').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);const title=f.get('title').trim();if(!title){toast('Escribe un nombre.');return}const start=Number(f.get('start')),duration=Number(f.get('duration'));if(start+duration>8){toast('La actividad debe terminar como máximo en julio.');return}tasks.push({id:Date.now(),title,area:f.get('area'),status:f.get('status'),start,duration,priority:Number(f.get('priority')),deliverable:f.has('deliverable')});persist();render();$('#activity-dialog').close();e.target.reset();toast(f.has('deliverable')?'Entregable creado':'Actividad creada en el plan')};
-document.querySelectorAll('[data-person]').forEach(b=>b.onclick=()=>{const a=b.dataset.person;if(areas.includes(a)){area=a;$('#area').value=a;setView('overview');render();toast('Mostrando el plan de '+a)}else toast('Ana Castillo coordina las áreas de Calidad, Digital y Marketing.')});$('#export').onclick=()=>{const rows=[['Actividad','Área','Responsable','Inicio','Duración (meses)','Estado','Entregable'],...tasks.filter(t=>area==='all'||t.area===area).map(t=>[t.title,t.area,owners[t.area],months[Math.floor(t.start)],t.duration,label(t.status),t.deliverable?'Sí':'No'])];const csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const link=document.createElement('a');link.href=url;link.download='orbita-plan-estrategico.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Plan exportado')};$('#notification').onclick=()=>toast('Datos de ejemplo · Los cambios se guardan en este navegador.');render();
-
-function renderMetrics(filtered,deliveries,done,progress){
- const selectedAreas=areas.filter(a=>area==='all'||area===a);$('#area-count').textContent=selectedAreas.length;
- $('#area-bars').innerHTML=selectedAreas.map(a=>{const list=filtered.filter(t=>t.area===a),p=Math.round(list.reduce((n,t)=>n+taskProgress(t),0)/(list.length||1));return '<div class="area-bar-row"><span><i class="dot '+classes[a]+'"></i>'+a+'</span><div class="area-bar '+classes[a]+'"><span style="width:'+p+'%"></span></div><b>'+p+'%</b></div>'}).join('');
- $('#completion-ring').style.setProperty('--completion',(deliveries.length?done/deliveries.length*100:0)+'%');
- const next=filtered.filter(t=>t.status!=='done').sort((a,b)=>a.start-b.start)[0];$('#next-step').textContent=next?next.title:'Todos los resultados completados';
- // Compare the current state of each activity with its planned cumulative completion.
- const n=filtered.length||1;const planned=months.map((m,i)=>filtered.filter(t=>t.start+t.duration<=i+1).length/n*100);
- const actual=months.map((m,i)=>filtered.filter(t=>t.start<=i).reduce((sum,t)=>sum+taskProgress(t),0)/n);
- const points=values=>values.map((v,i)=>(18+i*43)+','+(83-v*.67)).join(' ');
- $('#execution-chart').innerHTML='<svg viewBox="0 0 340 108" role="img" aria-label="Avance acumulado por mes de inicio. Avance actual '+progress+' por ciento. Línea punteada: finalización planificada."><defs><linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#58b5aa" stop-opacity=".24"/><stop offset="100%" stop-color="#58b5aa" stop-opacity=".01"/></linearGradient></defs>'+[16,49,83].map(y=>'<line x1="18" y1="'+y+'" x2="319" y2="'+y+'" stroke="#e9efef" stroke-dasharray="3 5"/>').join('')+'<polyline points="'+points(planned)+'" fill="none" stroke="#c7d3d7" stroke-width="1.5" stroke-dasharray="5 5"/><polygon points="18,83 '+points(actual)+' 319,83" fill="url(#chart-fill)"/><polyline points="'+points(actual)+'" fill="none" stroke="#399d91" stroke-width="2.5" stroke-linejoin="round"/>'+actual.map((v,i)=>'<circle cx="'+(18+i*43)+'" cy="'+(83-v*.67)+'" r="3" fill="white" stroke="#399d91" stroke-width="2"/>').join('')+months.map((m,i)=>'<text x="'+(18+i*43)+'" y="103" text-anchor="middle" fill="#94a1a9" font-size="9">'+m+'</text>').join('')+'</svg>';
-}
+$('#export').onclick=()=>{const rows=[['Actividad','Área','Responsable','Inicio','Duración (meses)','Estado','Entregable'],...tasks.filter(t=>area==='all'||t.area===area).map(t=>[t.title,t.area,owners[t.area],months[Math.floor(t.start)],t.duration,label(t.status),t.deliverable?'Sí':'No'])];const csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const link=document.createElement('a');link.href=url;link.download='orbita-plan-estrategico.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Plan exportado')};$('#notification').onclick=()=>toast('Datos de ejemplo · Los cambios se guardan en este navegador.');render();
 
 const sidebarToggle = $('#sidebar-toggle');
 const compactScreen = window.matchMedia('(max-width: 1050px)');

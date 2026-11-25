@@ -248,8 +248,38 @@ body[data-sidebar="collapsed"] .profile { justify-content: center; }
 .team-panel .person.lead:hover { box-shadow: inset 0 0 0 2px #bba9ff; }
 
 /* Distribución de la vista general */
+.person, .project-table-row, .project-bar, .diagram-task, span.backlog-title {
+  cursor: default;
+}
+.team-panel .org-branches .person:hover,
+.team-panel .person.lead:hover {
+  box-shadow: none;
+}
+.person:hover { border-color: #e7ebf3; }
+.project-table-row:hover { background: white; }
+span.backlog-title:hover { color: inherit; text-decoration: none; }
+.project-bar:hover .project-bar-base { stroke-width: .6; }
+.project-bar.quality:hover .project-bar-base { stroke: #a5cabc; }
+.project-bar.digital:hover .project-bar-base { stroke: #c0abd9; }
+.project-bar.marketing:hover .project-bar-base { stroke: #dcc296; }
 .dashboard {
   align-items: start;
+}
+.dashboard:not(.focused) {
+  grid-template-areas: "timeline" "flow" "team" "resources";
+}
+.dashboard:not(.focused) .timeline-panel { grid-area: timeline; }
+.dashboard:not(.focused) .flow-panel { grid-area: flow; }
+.dashboard:not(.focused) .team-panel { grid-area: team; }
+.dashboard:not(.focused) #resource-hub { grid-area: resources; }
+.dashboard:not(.focused) .flow-panel .strategy-map {
+  max-height: 680px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.dashboard:not(.focused) .map-vision,
+.dashboard:not(.focused) .map-review {
+  grid-template-columns: minmax(0, 1fr);
 }
 .timeline-panel .panel-heading,
 .flow-panel .panel-heading,
@@ -278,12 +308,12 @@ body[data-sidebar="collapsed"] .profile { justify-content: center; }
 .flow-panel #processes { padding-block: 4px; }
 .flow-panel .workflow-svg { margin-inline: auto; }
 
-@media (min-width: 1320px) {
+@media (min-width: 900px) {
   .dashboard:not(.focused) {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "flow timeline" "team ." "resources resources";
     gap: 18px;
   }
-  .dashboard:not(.focused) :is(.timeline-panel, .flow-panel) { grid-column: 1 / -1; }
   .dashboard:not(.focused) .team-panel .org { padding-inline: 14px; }
 }
 @media (max-width: 480px) {
@@ -408,10 +438,9 @@ dialog :is(button.button, input, select, label) {
 .diagram-lane.marketing { --lane-fill: #fff2df; --lane-ink: #87440a; }
 .diagram-lane-bg { fill: var(--lane-fill); }
 .diagram-lane-label { fill: var(--lane-ink); font-size: 16px; font-weight: 700; }
-.diagram-task { cursor: pointer; }
+.diagram-task { cursor: default; }
 .diagram-task rect { fill: white; stroke: var(--lane-ink); stroke-width: 1.5; }
 .diagram-task text { fill: #172541; font-size: 14px; font-weight: 700; }
-.diagram-task:hover rect, .diagram-task:focus-visible rect { fill: var(--lane-fill); stroke-width: 3; }
 .diagram-wire, .diagram-arrow, .diagram-return {
   fill: none;
   stroke: #52617a;
